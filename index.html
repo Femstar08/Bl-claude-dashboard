@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Beacon & Ledger Prospect Management Dashboard - Cloud-connected CRM for Manchester accounting practice">
+    <title>Beacon & Ledger - Prospect Dashboard</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1F2A44 0%, #2a3a5a 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left h1 {
+            color: #1F2A44;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .header-left p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .sync-status.syncing {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .sync-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .logo-accent {
+            color: #1DE9B6;
+        }
+
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .add-prospect-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .add-prospect-panel h2 {
+            color: #1F2A44;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #1F2A44;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #1DE9B6;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #1DE9B6;
+            color: #1F2A44;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #19d4a5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(29, 233, 182, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .prospects-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .prospects-panel h2 {
+            color: #1F2A44;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .stat-card .number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1F2A44;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 5px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            background: #e9ecef;
+        }
+
+        .filter-btn.active {
+            background: #1DE9B6;
+            border-color: #1DE9B6;
+            color: #1F2A44;
+            font-weight: 600;
+        }
+
+        .prospect-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #1DE9B6;
+            transition: all 0.3s;
+        }
+
+        .prospect-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateX(5px);
+        }
+
+        .prospect-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .prospect-title {
+            flex: 1;
+        }
+
+        .prospect-title h3 {
+            color: #1F2A44;
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .prospect-title .company {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-new { background: #e3f2fd; color: #1976d2; }
+        .status-contacted { background: #fff3e0; color: #f57c00; }
+        .status-meeting-scheduled { background: #f3e5f5; color: #7b1fa2; }
+        .status-proposal-sent { background: #e8f5e9; color: #388e3c; }
+        .status-won { background: #1DE9B6; color: #1F2A44; }
+        .status-lost { background: #ffebee; color: #c62828; }
+
+        .prospect-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-item strong {
+            color: #1F2A44;
+        }
+
+        .workflow-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .workflow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .workflow-header h4 {
+            color: #1F2A44;
+            font-size: 16px;
+        }
+
+        .workflow-progress {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .task-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: start;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+
+        .task-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #1DE9B6;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .task-title {
+            font-weight: 600;
+            color: #1F2A44;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .task-description {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .task-item.completed {
+            opacity: 0.6;
+        }
+
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+        }
+
+        .add-task-btn {
+            padding: 6px 12px;
+            background: #1F2A44;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .add-task-btn:hover {
+            background: #2a3a5a;
+        }
+
+        .task-form {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .task-form.active {
+            display: block;
+        }
+
+        .task-form input,
+        .task-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .task-form-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .task-form button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .save-task-btn {
+            background: #1DE9B6;
+            color: #1F2A44;
+        }
+
+        .cancel-task-btn {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .actions-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .actions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .actions-header h4 {
+            color: #1F2A44;
+            font-size: 16px;
+        }
+
+        .add-action-btn {
+            padding: 6px 12px;
+            background: #1F2A44;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .add-action-btn:hover {
+            background: #2a3a5a;
+        }
+
+        .action-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .action-item .action-date {
+            color: #1DE9B6;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .action-item .action-text {
+            color: #555;
+        }
+
+        .action-form {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .action-form.active {
+            display: block;
+        }
+
+        .action-form input,
+        .action-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .action-form-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-form button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .save-action-btn {
+            background: #1DE9B6;
+            color: #1F2A44;
+        }
+
+        .cancel-action-btn {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .prospect-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .prospect-action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .edit-btn {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .delete-btn {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .loading h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+        }
+
+        .error-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #c62828;
+        }
+
+        .error-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .error-state p {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .error-state .error-details {
+            background: #ffebee;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px auto;
+            max-width: 600px;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .error-state .error-details code {
+            background: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+
+            .add-prospect-panel {
+                position: static;
+            }
+
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .prospect-details {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>Beacon <span class="logo-accent">&</span> Ledger</h1>
+            <p>Prospect Management Dashboard</p>
+        </div>
+        <div class="sync-status" id="syncStatus">
+            <span class="sync-dot"></span>
+            <span id="syncText">Initializing...</span>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Add Prospect Panel -->
+        <div class="add-prospect-panel">
+            <h2 id="formTitle">Add New Prospect</h2>
+            <form id="prospectForm">
+                <div class="form-group">
+                    <label for="companyName">Company Name *</label>
+                    <input type="text" id="companyName" required placeholder="e.g., Cytix">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactName">Contact Name *</label>
+                    <input type="text" id="contactName" required placeholder="e.g., Ben Armstrong">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactEmail">Email</label>
+                    <input type="email" id="contactEmail" placeholder="contact@company.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactPhone">Phone</label>
+                    <input type="tel" id="contactPhone" placeholder="0161 123 4567">
+                </div>
+
+                <div class="form-group">
+                    <label for="industry">Industry</label>
+                    <input type="text" id="industry" placeholder="e.g., Cybersecurity">
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Status *</label>
+                    <select id="status" required>
+                        <option value="New">New</option>
+                        <option value="Contacted">Contacted</option>
+                        <option value="Meeting Scheduled">Meeting Scheduled</option>
+                        <option value="Proposal Sent">Proposal Sent</option>
+                        <option value="Won">Won</option>
+                        <option value="Lost">Lost</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" placeholder="Add any relevant notes about this prospect..."></textarea>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">Add Prospect</button>
+            </form>
+        </div>
+
+        <!-- Prospects List Panel -->
+        <div class="prospects-panel">
+            <h2>Your Prospects</h2>
+            
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <div class="number" id="totalProspects">0</div>
+                    <div class="label">Total Prospects</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="newProspects">0</div>
+                    <div class="label">New</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="activeProspects">0</div>
+                    <div class="label">Active</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="wonProspects">0</div>
+                    <div class="label">Won</div>
+                </div>
+            </div>
+
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="New">New</button>
+                <button class="filter-btn" data-filter="Contacted">Contacted</button>
+                <button class="filter-btn" data-filter="Meeting Scheduled">Meeting Scheduled</button>
+                <button class="filter-btn" data-filter="Proposal Sent">Proposal Sent</button>
+                <button class="filter-btn" data-filter="Won">Won</button>
+                <button class="filter-btn" data-filter="Lost">Lost</button>
+            </div>
+
+            <div id="prospectsList">
+                <div class="loading">
+                    <h3>Loading prospects...</h3>
+                    <p>Connecting to database</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase client using the UMD bundle
+        const { createClient } = supabase;
+        
+        const SUPABASE_URL = 'https://uxweskdolfgtlztbsyfn.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4d2Vza2RvbGZndGx6dGJzeWZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NDAxNDEsImV4cCI6MjA2NjExNjE0MX0.1I43bs49n3vETRj1cs8bqNPfkW8BYub5y5WEpjh56Hg';
+        
+        const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Initial data with Cytix and Sourceful
+        const initialProspects = [
+            {
+                id: 'cytix-initial',
+                company_name: 'Cytix',
+                contact_name: 'Ben Armstrong (CEO)',
+                contact_email: 'LinkedIn: linkedin.com/in/benarmstrong2/',
+                contact_phone: 'To be researched',
+                industry: 'Cybersecurity / B2B SaaS',
+                status: 'New',
+                notes: 'Recently raised £1.6M seed funding (Sept 2024). Scaling operations and planning to double client base in 12 months. Perfect fit: tech-savvy founders, growth phase, need strategic financial planning and cash flow management. Co-founders: Ben Armstrong, Thomas Ballin, Matt Milan.',
+                tasks: [
+                    { title: 'Research company and founders', description: 'Review their LinkedIn profiles, recent funding announcement, and company updates. Check Companies House for current structure.', completed: false },
+                    { title: 'Find warm introduction', description: 'Look for mutual connections via LinkedIn or Manchester tech ecosystem (Manchester Digital, Praetura Ventures network).', completed: false },
+                    { title: 'Send LinkedIn connection request', description: 'Personalized message: "Congratulations on your recent funding! As a fellow Manchester business supporting the local tech ecosystem, I\'d love to connect. We help scaling startups optimize their financial operations post-funding."', completed: false },
+                    { title: 'Prepare initial email', description: 'Draft warm email highlighting: Strategic tax planning for R&D investments, cash flow optimization during scaling, advisory support for financial decision-making. Opening: "Scaling a cybersecurity startup post-funding? Let\'s ensure your finances are as secure as the products you build."', completed: false },
+                    { title: 'Offer value-add resource', description: 'Create and send "Post-Funding Financial Checklist for Tech Startups" or similar resource to demonstrate expertise.', completed: false },
+                    { title: 'Follow up after 1 week', description: 'If no response to initial outreach, send follow-up with additional insight or case study relevant to their stage.', completed: false }
+                ]
+            },
+            {
+                id: 'sourceful-initial',
+                company_name: 'Sourceful',
+                contact_name: 'Wing Yung Chan (CEO)',
+                contact_email: 'Via company website',
+                contact_phone: 'To be researched',
+                industry: 'Sustainable Packaging / E-commerce SaaS',
+                status: 'New',
+                notes: 'Series A funded ($32M+ total). 115+ employees, multi-jurisdiction ops (UK, EU, US, China). Former CTO of The Hut Group, chose Manchester as HQ intentionally. Perfect for Fractional FD services and strategic advisory. Very sustainability-focused and values-aligned.',
+                tasks: [
+                    { title: 'Deep dive research', description: 'Review company blog, recent announcements, ISO certification achievement. Understand their supply chain complexity and international operations.', completed: false },
+                    { title: 'Identify finance decision-maker', description: 'Research if they have a CFO or Finance Director. Check LinkedIn for finance team members. May need to approach CEO or COO if no dedicated CFO.', completed: false },
+                    { title: 'Find Manchester connection', description: 'Leverage their Manchester pride - reference Wing\'s blog post about choosing Manchester as HQ. Look for shared Manchester business community connections.', completed: false },
+                    { title: 'Craft strategic outreach', description: 'Email focusing on: Multi-jurisdiction accounting expertise, strategic planning for high-growth scale-ups, Fractional FD services. Opening: "Building sustainable supply chains globally? Let\'s ensure your financial infrastructure is equally robust as you scale."', completed: false },
+                    { title: 'Prepare business review offer', description: 'Develop complimentary "Scale-Up Financial Health Check" or "International Operations Financial Optimization Assessment" specifically for them.', completed: false },
+                    { title: 'Attend relevant events', description: 'Look for Manchester tech/sustainability events where Sourceful team might be present. Position as fellow Manchester business champion.', completed: false },
+                    { title: 'Follow-up strategy', description: 'If initial outreach is successful, prepare materials on Fractional FD services and case studies of similar scale-up clients.', completed: false }
+                ]
+            }
+        ];
+
+        // State management
+        let prospects = [];
+        let currentFilter = 'all';
+        let editingId = null;
+
+        // Update sync status
+        function updateSyncStatus(status, text) {
+            const syncStatus = document.getElementById('syncStatus');
+            const syncText = document.getElementById('syncText');
+            
+            syncStatus.className = 'sync-status ' + status;
+            syncText.textContent = text;
+        }
+
+        // Show error state
+        function showError(message, details) {
+            const listContainer = document.getElementById('prospectsList');
+            listContainer.innerHTML = `
+                <div class="error-state">
+                    <h3>⚠️ Database Connection Error</h3>
+                    <p>${message}</p>
+                    <div class="error-details">
+                        <strong>What to check:</strong><br>
+                        1. Have you created the database tables? Run the SQL script in Supabase SQL Editor.<br>
+                        2. Are the tables named <code>bl_crm_prospects</code>, <code>bl_crm_tasks</code>, and <code>bl_crm_actions</code>?<br>
+                        3. Is Row Level Security configured with the correct policies?<br><br>
+                        <strong>Error details:</strong><br>
+                        ${details || 'Check browser console (F12) for more info'}
+                    </div>
+                </div>
+            `;
+            updateSyncStatus('error', 'Database Error');
+        }
+
+        // Initialize database with sample data if empty
+        async function initializeDatabase() {
+            try {
+                console.log('Checking for existing prospects...');
+                const { data: existingProspects, error } = await client
+                    .from('bl_crm_prospects')
+                    .select('id')
+                    .limit(1);
+
+                if (error) {
+                    console.error('Database query error:', error);
+                    showError('Cannot connect to database', error.message);
+                    return false;
+                }
+
+                if (!existingProspects || existingProspects.length === 0) {
+                    console.log('No prospects found. Initializing with Cytix and Sourceful...');
+                    
+                    for (const prospect of initialProspects) {
+                        const tasks = prospect.tasks;
+                        delete prospect.tasks;
+                        
+                        console.log('Inserting prospect:', prospect.company_name);
+                        const { data: newProspect, error: prospectError } = await client
+                            .from('bl_crm_prospects')
+                            .insert(prospect)
+                            .select()
+                            .single();
+
+                        if (prospectError) {
+                            console.error('Error inserting prospect:', prospectError);
+                            throw prospectError;
+                        }
+
+                        console.log('Prospect inserted:', newProspect.id);
+
+                        for (let i = 0; i < tasks.length; i++) {
+                            const task = tasks[i];
+                            const { error: taskError } = await client
+                                .from('bl_crm_tasks')
+                                .insert({
+                                    id: `${newProspect.id}-task-${i}`,
+                                    prospect_id: newProspect.id,
+                                    title: task.title,
+                                    description: task.description,
+                                    completed: task.completed,
+                                    sort_order: i
+                                });
+                            
+                            if (taskError) {
+                                console.error('Error inserting task:', taskError);
+                                throw taskError;
+                            }
+                        }
+                        
+                        console.log(`Added ${tasks.length} tasks for ${prospect.company_name}`);
+                    }
+                    
+                    console.log('✅ Sample prospects added successfully!');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error initializing database:', error);
+                showError('Failed to initialize database', error.message);
+                return false;
+            }
+        }
+
+        // Load all data from Supabase
+        async function loadData() {
+            try {
+                updateSyncStatus('syncing', 'Loading...');
+                console.log('Loading all data from Supabase...');
+                
+                const { data: prospectsData, error: prospectsError } = await client
+                    .from('bl_crm_prospects')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (prospectsError) {
+                    console.error('Error loading prospects:', prospectsError);
+                    throw prospectsError;
+                }
+
+                const { data: tasksData, error: tasksError } = await client
+                    .from('bl_crm_tasks')
+                    .select('*')
+                    .order('sort_order', { ascending: true });
+
+                if (tasksError) {
+                    console.error('Error loading tasks:', tasksError);
+                    throw tasksError;
+                }
+
+                const { data: actionsData, error: actionsError } = await client
+                    .from('bl_crm_actions')
+                    .select('*')
+                    .order('timestamp', { ascending: false });
+
+                if (actionsError) {
+                    console.error('Error loading actions:', actionsError);
+                    throw actionsError;
+                }
+
+                prospects = prospectsData.map(prospect => ({
+                    ...prospect,
+                    tasks: tasksData.filter(t => t.prospect_id === prospect.id),
+                    actions: actionsData.filter(a => a.prospect_id === prospect.id)
+                }));
+
+                console.log(`Loaded ${prospects.length} prospects with tasks and actions`);
+                renderProspects();
+                updateStats();
+                updateSyncStatus('', 'Connected');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError('Failed to load data from database', error.message);
+            }
+        }
+
+        // Add or update prospect
+        document.getElementById('prospectForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            updateSyncStatus('syncing', 'Saving...');
+
+            try {
+                const prospectData = {
+                    company_name: document.getElementById('companyName').value,
+                    contact_name: document.getElementById('contactName').value,
+                    contact_email: document.getElementById('contactEmail').value,
+                    contact_phone: document.getElementById('contactPhone').value,
+                    industry: document.getElementById('industry').value,
+                    status: document.getElementById('status').value,
+                    notes: document.getElementById('notes').value
+                };
+
+                if (editingId) {
+                    const { error } = await client
+                        .from('bl_crm_prospects')
+                        .update(prospectData)
+                        .eq('id', editingId);
+
+                    if (error) throw error;
+                    editingId = null;
+                    document.getElementById('formTitle').textContent = 'Add New Prospect';
+                } else {
+                    prospectData.id = 'prospect-' + Date.now();
+                    const { error } = await client
+                        .from('bl_crm_prospects')
+                        .insert(prospectData);
+
+                    if (error) throw error;
+                }
+
+                this.reset();
+                await loadData();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) {
+                console.error('Error saving prospect:', error);
+                alert('Error saving prospect: ' + error.message);
+                updateSyncStatus('error', 'Save Failed');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = editingId ? 'Update Prospect' : 'Add Prospect';
+            }
+        });
+
+        // Toggle task completion
+        async function toggleTask(prospectId, taskId) {
+            try {
+                updateSyncStatus('syncing', 'Updating...');
+                
+                const prospect = prospects.find(p => p.id === prospectId);
+                const task = prospect.tasks.find(t => t.id === taskId);
+                
+                const { error } = await client
+                    .from('bl_crm_tasks')
+                    .update({ completed: !task.completed })
+                    .eq('id', taskId);
+
+                if (error) throw error;
+                
+                await loadData();
+            } catch (error) {
+                console.error('Error toggling task:', error);
+                alert('Error updating task: ' + error.message);
+                updateSyncStatus('error', 'Update Failed');
+            }
+        }
+
+        // Toggle task form
+        function toggleTaskForm(prospectId) {
+            const form = document.getElementById(`taskForm-${prospectId}`);
+            form.classList.toggle('active');
+            
+            if (!form.classList.contains('active')) {
+                document.getElementById(`taskTitle-${prospectId}`).value = '';
+                document.getElementById(`taskDescription-${prospectId}`).value = '';
+            }
+        }
+
+        // Save new task
+        async function saveTask(prospectId) {
+            const title = document.getElementById(`taskTitle-${prospectId}`).value;
+            const description = document.getElementById(`taskDescription-${prospectId}`).value;
+
+            if (!title.trim()) {
+                alert('Please enter a task title');
+                return;
+            }
+
+            try {
+                updateSyncStatus('syncing', 'Saving...');
+                
+                const prospect = prospects.find(p => p.id === prospectId);
+                const maxOrder = prospect.tasks.length > 0 
+                    ? Math.max(...prospect.tasks.map(t => t.sort_order)) 
+                    : -1;
+
+                const { error } = await client
+                    .from('bl_crm_tasks')
+                    .insert({
+                        id: 'task-' + Date.now(),
+                        prospect_id: prospectId,
+                        title: title,
+                        description: description,
+                        completed: false,
+                        sort_order: maxOrder + 1
+                    });
+
+                if (error) throw error;
+                
+                await loadData();
+                toggleTaskForm(prospectId);
+            } catch (error) {
+                console.error('Error saving task:', error);
+                alert('Error saving task: ' + error.message);
+                updateSyncStatus('error', 'Save Failed');
+            }
+        }
+
+        // Toggle action form
+        function toggleActionForm(prospectId) {
+            const form = document.getElementById(`actionForm-${prospectId}`);
+            form.classList.toggle('active');
+            
+            if (!form.classList.contains('active')) {
+                document.getElementById(`actionText-${prospectId}`).value = '';
+            }
+        }
+
+        // Save action
+        async function saveAction(prospectId) {
+            const date = document.getElementById(`actionDate-${prospectId}`).value;
+            const text = document.getElementById(`actionText-${prospectId}`).value;
+
+            if (!text.trim()) {
+                alert('Please enter an action description');
+                return;
+            }
+
+            try {
+                updateSyncStatus('syncing', 'Saving...');
+                
+                const { error } = await client
+                    .from('bl_crm_actions')
+                    .insert({
+                        id: 'action-' + Date.now(),
+                        prospect_id: prospectId,
+                        date: date,
+                        text: text
+                    });
+
+                if (error) throw error;
+                
+                await loadData();
+                toggleActionForm(prospectId);
+            } catch (error) {
+                console.error('Error saving action:', error);
+                alert('Error saving action: ' + error.message);
+                updateSyncStatus('error', 'Save Failed');
+            }
+        }
+
+        // Edit prospect
+        function editProspect(id) {
+            const prospect = prospects.find(p => p.id === id);
+            if (!prospect) return;
+
+            editingId = id;
+            document.getElementById('formTitle').textContent = 'Edit Prospect';
+            document.getElementById('companyName').value = prospect.company_name;
+            document.getElementById('contactName').value = prospect.contact_name;
+            document.getElementById('contactEmail').value = prospect.contact_email || '';
+            document.getElementById('contactPhone').value = prospect.contact_phone || '';
+            document.getElementById('industry').value = prospect.industry || '';
+            document.getElementById('status').value = prospect.status;
+            document.getElementById('notes').value = prospect.notes || '';
+            document.getElementById('submitBtn').textContent = 'Update Prospect';
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Delete prospect
+        async function deleteProspect(id) {
+            if (!confirm('Are you sure you want to delete this prospect? This will also delete all tasks and actions.')) {
+                return;
+            }
+
+            try {
+                updateSyncStatus('syncing', 'Deleting...');
+                
+                const { error } = await client
+                    .from('bl_crm_prospects')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                
+                await loadData();
+            } catch (error) {
+                console.error('Error deleting prospect:', error);
+                alert('Error deleting prospect: ' + error.message);
+                updateSyncStatus('error', 'Delete Failed');
+            }
+        }
+
+        // Render prospects list
+        function renderProspects() {
+            const listContainer = document.getElementById('prospectsList');
+            
+            let filteredProspects = prospects;
+            if (currentFilter !== 'all') {
+                filteredProspects = prospects.filter(p => p.status === currentFilter);
+            }
+
+            if (filteredProspects.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No prospects found</h3>
+                        <p>${currentFilter === 'all' ? 'Add your first prospect using the form on the left' : 'No prospects with this status'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = filteredProspects.map(prospect => {
+                const completedTasks = prospect.tasks ? prospect.tasks.filter(t => t.completed).length : 0;
+                const totalTasks = prospect.tasks ? prospect.tasks.length : 0;
+                
+                return `
+                <div class="prospect-card" data-id="${prospect.id}">
+                    <div class="prospect-header">
+                        <div class="prospect-title">
+                            <h3>${prospect.company_name}</h3>
+                            <div class="company">${prospect.contact_name}</div>
+                        </div>
+                        <span class="status-badge status-${prospect.status.toLowerCase().replace(/ /g, '-')}">${prospect.status}</span>
+                    </div>
+
+                    <div class="prospect-details">
+                        ${prospect.contact_email ? `<div class="detail-item"><strong>Email:</strong> ${prospect.contact_email}</div>` : ''}
+                        ${prospect.contact_phone ? `<div class="detail-item"><strong>Phone:</strong> ${prospect.contact_phone}</div>` : ''}
+                        ${prospect.industry ? `<div class="detail-item"><strong>Industry:</strong> ${prospect.industry}</div>` : ''}
+                        <div class="detail-item"><strong>Added:</strong> ${new Date(prospect.date_added).toLocaleDateString()}</div>
+                    </div>
+
+                    ${prospect.notes ? `<div style="margin: 15px 0; padding: 12px; background: white; border-radius: 6px; font-size: 14px; color: #555; line-height: 1.6;">${prospect.notes}</div>` : ''}
+
+                    <div class="workflow-section">
+                        <div class="workflow-header">
+                            <h4>🎯 Workflow Tasks</h4>
+                            <span class="workflow-progress">${completedTasks}/${totalTasks} completed</span>
+                        </div>
+
+                        ${prospect.tasks && prospect.tasks.length > 0 ? 
+                            prospect.tasks.map(task => `
+                                <div class="task-item ${task.completed ? 'completed' : ''}">
+                                    <input type="checkbox" 
+                                           class="task-checkbox" 
+                                           ${task.completed ? 'checked' : ''}
+                                           onchange="toggleTask('${prospect.id}', '${task.id}')">
+                                    <div class="task-content">
+                                        <div class="task-title">${task.title}</div>
+                                        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                                    </div>
+                                </div>
+                            `).join('') : 
+                            '<div style="color: #999; font-size: 13px; padding: 10px;">No tasks yet - click "Add Task" to create your workflow</div>'
+                        }
+
+                        <button class="add-task-btn" onclick="toggleTaskForm('${prospect.id}')" style="margin-top: 10px;">+ Add Task</button>
+
+                        <div class="task-form" id="taskForm-${prospect.id}">
+                            <input type="text" id="taskTitle-${prospect.id}" placeholder="Task title (e.g., Send LinkedIn connection request)">
+                            <textarea id="taskDescription-${prospect.id}" placeholder="Task description (optional)"></textarea>
+                            <div class="task-form-buttons">
+                                <button class="save-task-btn" onclick="saveTask('${prospect.id}')">Save Task</button>
+                                <button class="cancel-task-btn" onclick="toggleTaskForm('${prospect.id}')">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="actions-section">
+                        <div class="actions-header">
+                            <h4>📝 Actions Log (${prospect.actions ? prospect.actions.length : 0})</h4>
+                            <button class="add-action-btn" onclick="toggleActionForm('${prospect.id}')">+ Log Action</button>
+                        </div>
+
+                        <div class="action-form" id="actionForm-${prospect.id}">
+                            <input type="date" id="actionDate-${prospect.id}" value="${new Date().toISOString().split('T')[0]}">
+                            <textarea id="actionText-${prospect.id}" placeholder="What action did you take? (e.g., Sent LinkedIn connection request with personalized message)"></textarea>
+                            <div class="action-form-buttons">
+                                <button class="save-action-btn" onclick="saveAction('${prospect.id}')">Save</button>
+                                <button class="cancel-action-btn" onclick="toggleActionForm('${prospect.id}')">Cancel</button>
+                            </div>
+                        </div>
+
+                        <div id="actionsList-${prospect.id}">
+                            ${prospect.actions && prospect.actions.length > 0 ? 
+                                prospect.actions.map(action => `
+                                    <div class="action-item">
+                                        <div class="action-date">${new Date(action.date).toLocaleDateString()}</div>
+                                        <div class="action-text">${action.text}</div>
+                                    </div>
+                                `).join('') : 
+                                '<div style="color: #999; font-size: 13px; padding: 10px;">No actions logged yet</div>'
+                            }
+                        </div>
+                    </div>
+
+                    <div class="prospect-actions">
+                        <button class="prospect-action-btn edit-btn" onclick="editProspect('${prospect.id}')">Edit</button>
+                        <button class="prospect-action-btn delete-btn" onclick="deleteProspect('${prospect.id}')">Delete</button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('totalProspects').textContent = prospects.length;
+            document.getElementById('newProspects').textContent = prospects.filter(p => p.status === 'New').length;
+            document.getElementById('activeProspects').textContent = prospects.filter(p => 
+                ['Contacted', 'Meeting Scheduled', 'Proposal Sent'].includes(p.status)
+            ).length;
+            document.getElementById('wonProspects').textContent = prospects.filter(p => p.status === 'Won').length;
+        }
+
+        // Filter functionality
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.dataset.filter;
+                renderProspects();
+            });
+        });
+
+        // Initialize on page load
+        async function init() {
+            console.log('🚀 Initializing Beacon & Ledger CRM Dashboard');
+            const initialized = await initializeDatabase();
+            if (initialized) {
+                await loadData();
+                console.log('✅ Dashboard ready!');
+            }
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
